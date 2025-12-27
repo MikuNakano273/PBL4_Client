@@ -1,0 +1,60 @@
+# Python
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.pyc
+*.egg-info/
+*.egg
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# Build directories
+build/
+dist/
+
+# C++ Build artifacts
+*.obj
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.dll
+*.pyd
+
+# IDE / Editor
+.idea/
+.vscode/
+*.suo
+*.user
+*.sln
+*.sdf
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Optional: Virtual environments (if using poetry, conda, etc.)
+poetry.lock
+conda/
+Rules/
+**/DefenderYara/
+full_hash.db
+Old.zip
+yara_compiler.py
+all_rules.yarc
+uploaded_hashes_from_model_debug.json
+Old2.zip

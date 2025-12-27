@@ -1,0 +1,72 @@
+CREATE TABLE db_info (key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE sig_md5 (hash TEXT PRIMARY KEY, malware_name TEXT DEFAULT 'Unknown') WITHOUT ROWID;
+CREATE TABLE sig_sha1 (hash TEXT PRIMARY KEY, malware_name TEXT DEFAULT 'Unknown') WITHOUT ROWID;
+CREATE TABLE sig_sha256 (hash TEXT PRIMARY KEY, malware_name TEXT DEFAULT 'Unknown') WITHOUT ROWID;
+CREATE TABLE whitelist (
+    hash TEXT PRIMARY KEY,
+    hash_type TEXT NOT NULL CHECK(hash_type IN ('md5', 'sha1', 'sha256')),
+    note TEXT
+);
+CREATE TABLE quarantine_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    original_path TEXT NOT NULL,
+    stored_filename TEXT NOT NULL,
+    stored_path TEXT NOT NULL DEFAULT 'C:/ProgramData/PBL4_AV_DATA/Quarantine',
+    stored_size INTEGER NOT NULL,
+    quarantined_at TEXT NOT NULL DEFAULT (datetime('now')),
+    original_hash TEXT,
+    hash_type TEXT CHECK(hash_type IN ('md5', 'sha1', 'sha256')),
+    deleted INTEGER NOT NULL DEFAULT 0,
+    restored INTEGER NOT NULL DEFAULT 0,
+    restored_at TEXT,
+    restored_path TEXT
+);
+CREATE TABLE sqlite_sequence(name,seq);
+CREATE UNIQUE INDEX idx_quarantine_stored_filename ON quarantine_files(stored_filename);
+CREATE INDEX idx_quarantine_original_hash ON quarantine_files(original_hash);
+CREATE INDEX idx_quarantine_original_path ON quarantine_files(original_path);
+CREATE TRIGGER qf_after_insert AFTER INSERT ON quarantine_files
+BEGIN
+    UPDATE db_info
+      SET value = CAST(COALESCE(value, '0') AS INTEGER) + NEW.stored_size
+      WHERE key = 'quarantine_total_size';
+    INSERT INTO db_info(key, value)
+      SELECT 'quarantine_total_size', NEW.stored_size
+      WHERE (SELECT changes() = 0);
+END;
+CREATE TRIGGER qf_after_delete AFTER DELETE ON quarantine_files
+BEGIN
+    UPDATE db_info
+      SET value = CAST(COALESCE(value, '0') AS INTEGER) - OLD.stored_size
+      WHERE key = 'quarantine_total_size';
+    INSERT INTO db_info(key, value)
+      SELECT 'quarantine_total_size', 0
+      WHERE (SELECT changes() = 0);
+END;
+CREATE TRIGGER qf_after_update_stored_size AFTER UPDATE OF stored_size ON quarantine_files
+BEGIN
+    UPDATE db_info
+      SET value = CAST(COALESCE(value, '0') AS INTEGER) + (NEW.stored_size - OLD.stored_size)
+      WHERE key = 'quarantine_total_size';
+    INSERT INTO db_info(key, value)
+      SELECT 'quarantine_total_size', NEW.stored_size
+      WHERE (SELECT changes() = 0);
+END;
+CREATE TABLE quarantine_actions (
+    action_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id INTEGER,
+    action TEXT NOT NULL,
+    actor TEXT,
+    reason TEXT,
+    action_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_quarantine_actions_file_id ON quarantine_actions(file_id);
+CREATE VIEW view_quarantine_status AS
+SELECT
+  (SELECT value FROM db_info WHERE key='quarantine_folder_path') AS folder_path,
+  CAST((SELECT value FROM db_info WHERE key='quarantine_folder_limit_bytes') AS INTEGER) AS folder_limit_bytes,
+  CAST((SELECT value FROM db_info WHERE key='quarantine_safe_free_bytes') AS INTEGER) AS safe_free_bytes,
+  CAST((SELECT value FROM db_info WHERE key='quarantine_total_size') AS INTEGER) AS total_quarantine_bytes,
+  (CAST((SELECT value FROM db_info WHERE key='quarantine_folder_limit_bytes') AS INTEGER) - CAST((SELECT value FROM db_info WHERE key='quarantine_total_size') AS INTEGER)) AS remaining_quarantine_bytes
+/* view_quarantine_status(folder_path,folder_limit_bytes,safe_free_bytes,total_quarantine_bytes,remaining_quarantine_bytes) */
+/* view_quarantine_status(folder_path,folder_limit_bytes,safe_free_bytes,total_quarantine_bytes,remaining_quarantine_bytes) */;

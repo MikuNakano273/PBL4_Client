@@ -1,5 +1,6 @@
-# statistics.py
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QPushButton, QHBoxLayout, QFileDialog, QMessageBox
+import csv
+from PySide6.QtCore import Qt
 
 class StatisticsDialog(QDialog):
     def __init__(self, parent=None):
@@ -13,6 +14,7 @@ class StatisticsDialog(QDialog):
         layout.addWidget(QLabel("<h3>Scan Statistics</h3>"))
 
         self.table = QTableWidget(0, 5)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setHorizontalHeaderLabels(["Time", "Scanner", "File/Target", "Severity", "Notes"])
         layout.addWidget(self.table)
 
@@ -24,36 +26,73 @@ class StatisticsDialog(QDialog):
         layout.addLayout(btn_layout)
 
         self.setLayout(layout)
-        self.btn_load.clicked.connect(self.mock_load)
+        self.btn_load.clicked.connect(self.csv_load)
         self.btn_export.clicked.connect(self.export_csv)
 
-    def mock_load(self):
-        # demo: add some rows
-        self.table.setRowCount(3)
-        rows = [
-            ("2025-10-17 15:00", "YARA", "C:\\Windows\\System32", "High", "Match found"),
-            ("2025-10-17 16:10", "LOKI", "C:\\Users", "Medium", "suspicious"),
-            ("2025-10-17 17:20", "YARA", "D:\\Temp", "Low", "benign")
-        ]
-        for r,row in enumerate(rows):
-            for c,val in enumerate(row):
-                self.table.setItem(r, c, QTableWidgetItem(val))
+    def csv_load(self):
+        file_name, _ = QFileDialog.getOpenFileName(
+            self,
+            "Chọn file CSV",
+            "",
+            "CSV Files (*.csv)"
+        )
+
+        if not file_name:
+            return
+
+        try:
+            with open(file_name, newline='', encoding='utf-8') as csvfile:
+                reader = csv.reader(csvfile)
+                first_row = next(reader, None)
+
+                expected_header = ["virus-app"]
+                if first_row != expected_header:
+                    QMessageBox.warning(
+                        self,
+                        "Sai file",
+                        "File này không phải được tạo bởi ứng dụng của bạn!\nVui lòng chọn lại file đúng."
+                    )
+                    return
+
+                header_row = next(reader, None)
+
+                self.table.setRowCount(0)
+
+                for row in reader:
+                    if not row:
+                        continue
+                    row_position = self.table.rowCount()
+                    self.table.insertRow(row_position)
+                    for col, value in enumerate(row):
+                        item = QTableWidgetItem(value)
+                        item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # Không cho sửa
+                        self.table.setItem(row_position, col, item)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", f"Không thể đọc file:\n{e}")
 
     def export_csv(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Save CSV", filter="CSV files (*.csv);;All files (*.*)")
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save CSV",
+            filter="CSV files (*.csv);;All files (*.*)"
+        )
+
         if not path:
             return
+
         try:
-            with open(path, "w", encoding="utf-8") as f:
-                # header
-                headers = [self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())]
-                f.write(",".join(headers) + "\n")
+            with open(path, "w", encoding="utf-8", newline='') as f:
+                f.write("virus-app\n")
+
                 for r in range(self.table.rowCount()):
                     rowvals = []
                     for c in range(self.table.columnCount()):
                         item = self.table.item(r, c)
                         rowvals.append(item.text() if item else "")
                     f.write(",".join(rowvals) + "\n")
-            QMessageBox.information(self, "Saved", f"Exported to {path}")
+
+            QMessageBox.information(self, "Saved", f"File log đã được lưu: {path}")
+
         except Exception as e:
-            QMessageBox.critical(self, "Error", str(e))
+            QMessageBox.critical(self, "Error", f"Không thể lưu file:\n{e}")

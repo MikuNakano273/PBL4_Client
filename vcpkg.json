@@ -1,0 +1,10 @@
+@"
+{
+  "name": "pbl4-client",
+  "version-string": "1.0.0",
+  "dependencies": [
+    "yara",
+    "openssl"
+  ]
+}
+"@ | Out-File -Encoding UTF8 vcpkg.json
